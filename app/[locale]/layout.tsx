@@ -8,6 +8,7 @@ import { unstable_setRequestLocale } from 'next-intl/server';
 import { PropsWithChildren } from 'react';
 
 import '../globals.css';
+import '../styles/index.scss';
 
 import { client } from '~/client';
 import { graphql } from '~/client/graphql';
@@ -16,10 +17,15 @@ import { revalidate } from '~/client/revalidate-target';
 import { Notifications } from '../notifications';
 import { Providers } from '../providers';
 
-const inter = Inter({
-  subsets: ['latin'],
+const interBody = Inter({
   display: 'swap',
-  variable: '--font-inter',
+  subsets: ['latin'],
+  variable: '--font-family-body',
+});
+const interHeader = Inter({
+  display: 'swap',
+  subsets: ['latin'],
+  variable: '--font-family-heading',
 });
 
 const RootLayoutMetadataQuery = graphql(`
@@ -89,7 +95,7 @@ export default function RootLayout({ children, params: { locale } }: Props) {
   const messages = useMessages();
 
   return (
-    <html className={`${inter.variable} font-sans`} lang={locale}>
+    <html className={[interBody.variable, interHeader.variable].join(' ')} lang={locale}>
       <head>
         <DraftModeScript />
       </head>

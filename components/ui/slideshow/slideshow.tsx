@@ -3,9 +3,8 @@ import { ArrowLeft, ArrowRight, Pause, Play } from 'lucide-react';
 import NextImage, { StaticImageData } from 'next/image';
 import { useEffect, useReducer, useState } from 'react';
 
+import { Button } from '~/components/button';
 import { cn } from '~/lib/utils';
-
-import { Button } from '../button';
 
 interface Link {
   label: string;
@@ -135,7 +134,7 @@ const Slideshow = ({ className, interval = 15_000, slides }: Props) => {
                   <h2 className="text-5xl font-black lg:text-6xl">{slide.title}</h2>
                   {Boolean(slide.description) && <p className="max-w-xl">{slide.description}</p>}
                   {slide.cta && (
-                    <Button asChild className="w-fit">
+                    <Button variant="primary" asChild className="w-fit">
                       <a href={slide.cta.href}>{slide.cta.label}</a>
                     </Button>
                   )}

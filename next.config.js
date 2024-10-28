@@ -5,6 +5,8 @@ const createNextIntlPlugin = require('next-intl/plugin');
 const withMakeswift = createWithMakeswift({ previewMode: false });
 const withNextIntl = createNextIntlPlugin();
 
+const path = require('path');
+
 const { cspHeader } = require('./lib/content-security-policy');
 
 /** @type {import('next').NextConfig} */
@@ -19,6 +21,26 @@ let nextConfig = {
   eslint: {
     ignoreDuringBuilds: !!process.env.CI,
     dirs: ['app', 'client', 'components', 'lib', 'middlewares'],
+  },
+  sassOptions: {
+    includePaths: [path.join(__dirname, 'node_modules'), path.join(__dirname, 'app/styles')],
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'cdn11.bigcommerce.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'articles.blueoceanride.com',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3000',
+      },
+    ],
   },
   webpack: (config, { isServer }) => {
     if (process.env.NODE_V8_COVERAGE) {
