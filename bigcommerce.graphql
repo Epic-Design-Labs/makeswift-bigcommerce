@@ -1,3 +1,6 @@
+"""Directive that allows overriding shopper preferences."""
+directive @shopperPreferences(locale: String) on QUERY
+
 """An error due to customer registration being disabled on a storefront."""
 type AccountCreationDisabledError implements Error {
   """A description of the error."""
@@ -807,6 +810,9 @@ input CreateCartRedirectUrlsInput {
 
   """The query parameters to pass when redirecting to the URLs."""
   queryParams: [CreateCartRedirectUrlsQueryParamsInput!]
+
+  """IP4 or IP6 compatible address to include in the session redirect url"""
+  ipAddress: IpAddress
 }
 
 """Create cart redirect URLs query params input object."""
@@ -1158,6 +1164,37 @@ interface Error {
 }
 
 """
+Error that occured as a result of generateSessionSyncJwtToken mutation when cartId is provided and not found.
+"""
+type GenerateSessionSyncTokenCartNotFound implements Error {
+  """Not found error message."""
+  message: String!
+}
+
+"""Data returned for the generateSessionSyncJwtToken mutation."""
+type GenerateSessionSyncTokenData {
+  """Generated session sync token"""
+  token: String!
+
+  """URL to synchronize the session"""
+  url: String!
+}
+
+"""
+Error that occured as a result of generateSessionSyncJwtToken mutation.
+"""
+union GenerateSessionSyncTokenError = GenerateSessionSyncTokenCartNotFound
+
+"""Result of the generateSessionSyncJwtToken mutation."""
+type GenerateSessionSyncTokenResult {
+  """The result of the mutation when successful."""
+  result: GenerateSessionSyncTokenData
+
+  """The errors that occurred during the mutation."""
+  errors: [GenerateSessionSyncTokenError!]!
+}
+
+"""
 Validation errors dealing with input parameters supplied to an rpc call.
 """
 type InvalidInputFieldsError implements Error {
@@ -1165,6 +1202,36 @@ type InvalidInputFieldsError implements Error {
   fields: [String!]!
 
   """Error message."""
+  message: String!
+}
+
+"""Invalid Jwt token."""
+type InvalidSessionSyncJwtError implements Error {
+  """Enum with error type."""
+  errorType: InvalidSessionSyncJwtErrorType!
+
+  """A description of the error"""
+  message: String!
+}
+
+"""Enum with error type."""
+enum InvalidSessionSyncJwtErrorType {
+  """Unknown issue with the token."""
+  OTHER
+
+  """Shopper IP of JWT token mismatch."""
+  SHOPPER_IP_MISMATCH
+
+  """Store ID of JWT token mismatch."""
+  STORE_ID_MISMATCH
+}
+
+"""IP4 or IP6 compatible ip address"""
+scalar IpAddress
+
+"""JWT token is expired."""
+type JwtTokenExpiredError implements Error {
+  """A description of the error"""
   message: String!
 }
 
@@ -1281,6 +1348,27 @@ type Mutation {
     """The guest cart entity Id which should be assigned."""
     guestCartEntityId: String
   ): LoginWithCustomerLoginJwtResult!
+
+  """Generate Session Sync JWT Token."""
+  generateSessionSyncJwt(
+    """The route where to redirect after generation of token"""
+    redirectTo: String!
+
+    """The cartId for which token should be created."""
+    cartId: String
+
+    """The visitor Id."""
+    visitorId: String
+
+    """IP4 or IP6 compatible address to include in the session redirect url"""
+    ipAddress: IpAddress
+  ): GenerateSessionSyncTokenResult!
+
+  """Unwrapping encoded in jwt token session state."""
+  validateSessionSyncJwt(
+    """jwt token session state with encoded session state."""
+    jwt: String!
+  ): ValidateSessionSyncJwtResult!
 }
 
 """The not authorized to perform operation error."""
@@ -1454,6 +1542,24 @@ input SelectCheckoutShippingOptionInput {
 type SelectCheckoutShippingOptionResult {
   """The Checkout that is updated as a result of mutation."""
   checkout: Checkout
+}
+
+"""Restored session state."""
+type SessionSyncJwtContent {
+  """Customer information."""
+  customer: Customer
+
+  """Customer access token."""
+  customerAccessToken: CustomerAccessToken
+
+  """Cart information."""
+  cart: Cart
+
+  """Analytics information."""
+  analytics: ValidateSessionSyncJwtAnalytics
+
+  """URL to redirect to."""
+  redirectTo: String!
 }
 
 """Input for contact us form"""
@@ -1843,6 +1949,24 @@ type UpdateWishlistResult {
   result: Wishlist!
 }
 
+"""Analytics information."""
+type ValidateSessionSyncJwtAnalytics {
+  """Visitor ID."""
+  visitorId: String
+}
+
+"""An union error for restoring a session errors."""
+union ValidateSessionSyncJwtError = InvalidSessionSyncJwtError | JwtTokenExpiredError
+
+"""Restored session state or errors."""
+type ValidateSessionSyncJwtResult {
+  """Restored session state."""
+  content: SessionSyncJwtContent
+
+  """Restored session errors."""
+  errors: [ValidateSessionSyncJwtError!]!
+}
+
 """Validation error that occurred during a graphql request"""
 type ValidationError implements Error {
   """Path to the field that caused the error, if applicable"""
@@ -2080,6 +2204,32 @@ interface BaseOrder {
 
   """Message from customer"""
   customerMessage: String
+
+  """Metafield data related to an order."""
+  metafields(
+    """Metafield namespace filter"""
+    namespace: String!
+
+    """Labels for identifying metafield data values."""
+    keys: [String!] = []
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): MetafieldConnection!
+
+  """Cart metafields associated with the order."""
+  cartMetafields(
+    """Metafield namespace filter"""
+    namespace: String!
+
+    """Labels for identifying metafield data values."""
+    keys: [String!] = []
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): MetafieldConnection!
 }
 
 """Blog details."""
@@ -4353,6 +4503,21 @@ type GiftWrappingEdge {
   cursor: String!
 }
 
+"""HSTS settings"""
+type HstsSettings {
+  """Flag indicating if HSTS is enabled on storefront."""
+  hstsOnStorefrontEnabled: Boolean!
+
+  """Flag indicating if HSTS is enabled in preload."""
+  hstsInPreloadEnabled: Boolean!
+
+  """Flag indicating if HSTS is enabled in subdomains."""
+  hstsInSubdomainsEnabled: Boolean!
+
+  """Value of Max-Age header for HSTS."""
+  hstsMaxAgeDurationSeconds: Long!
+}
+
 """Image"""
 type Image {
   """Absolute path to image using store CDN."""
@@ -4406,6 +4571,24 @@ type ImageEdge {
 
   """A cursor for use in pagination."""
   cursor: String!
+}
+
+"""Inactivity settings from control panel"""
+type InactivitySettings {
+  """
+  Duration in seconds indicating how long a shopper can be inactive before being logged out.
+  """
+  shopperInactivityDurationSeconds: Long
+
+  """
+  Flag informing if any shopper activity extends the inactivity duration.
+  """
+  shopperActivityExtendsDuration: Boolean
+
+  """
+  Duration in seconds indicating how long a control panel user can be inactive before being logged out.
+  """
+  controlPanelInactivityDurationSeconds: Long
 }
 
 """An inventory"""
@@ -5128,6 +5311,32 @@ type Order implements Node & BaseOrder {
 
   """Message from customer"""
   customerMessage: String
+
+  """Metafield data related to an order."""
+  metafields(
+    """Metafield namespace filter"""
+    namespace: String!
+
+    """Labels for identifying metafield data values."""
+    keys: [String!] = []
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): MetafieldConnection!
+
+  """Cart metafields associated with the order."""
+  cartMetafields(
+    """Metafield namespace filter"""
+    namespace: String!
+
+    """Labels for identifying metafield data values."""
+    keys: [String!] = []
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): MetafieldConnection!
 }
 
 """An address for an order."""
@@ -5251,6 +5460,9 @@ input OrderDateRangeFilterInput {
 type OrderDigitalLineItem implements OrderLineItemInterface {
   """Digital line item ID."""
   entityId: Int!
+
+  """ID of the product associated with the line item."""
+  productEntityId: Int!
 
   """Digital line item display name."""
   name: String!
@@ -5432,6 +5644,9 @@ type OrderLineItemWrapping {
 type OrderPhysicalLineItem implements OrderLineItemInterface {
   """Line item ID."""
   entityId: Int!
+
+  """ID of the product associated with the line item."""
+  productEntityId: Int!
 
   """Display name."""
   name: String!
@@ -5790,6 +6005,32 @@ type OrderWithPayments implements Node & BaseOrder {
 
   """Message from customer"""
   customerMessage: String
+
+  """Metafield data related to an order."""
+  metafields(
+    """Metafield namespace filter"""
+    namespace: String!
+
+    """Labels for identifying metafield data values."""
+    keys: [String!] = []
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): MetafieldConnection!
+
+  """Cart metafields associated with the order."""
+  cartMetafields(
+    """Metafield namespace filter"""
+    namespace: String!
+
+    """Labels for identifying metafield data values."""
+    keys: [String!] = []
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): MetafieldConnection!
 }
 
 """A connection to a list of orders."""
@@ -6160,6 +6401,15 @@ type Prices {
 
   """List of bulk pricing tiers applicable to a product or variant."""
   bulkPricing: [BulkPricingTier!]!
+}
+
+"""Privacy settings from control panel"""
+type PrivacySettings {
+  """Flag indicating if cookie consent is enabled."""
+  cookieConsentEnabled: Boolean!
+
+  """URL to the privacy policy."""
+  privacyPolicyUrl: String
 }
 
 """Product"""
@@ -6713,6 +6963,9 @@ type Query {
   """An inventory"""
   inventory: Inventory!
 
+  """Shopper preferences."""
+  shopperPreferences: ShopperPreferences!
+
   """The current store."""
   store: Store!
 
@@ -7101,6 +7354,18 @@ type SearchQueries {
   ): SearchProducts!
 }
 
+"""Security settings from control panel"""
+type SecuritySettings {
+  """Value of custom Content Security Policy header."""
+  customCspHeader: String
+
+  """Value of X-Frame-Options header."""
+  xFrameOptions: String
+
+  """HSTS settings from control panel"""
+  hsts: HstsSettings
+}
+
 """Segment.com analytics provider."""
 type SegmentProvider {
   """Segment.com source identifier."""
@@ -7180,6 +7445,12 @@ type Settings {
   """Store locales."""
   locales: [Locale!]!
 
+  """Store favicon url."""
+  faviconUrl: String
+
+  """Analytics settings."""
+  webAnalytics: WebAnalytics
+
   """
   The form fields to display on the storefront during customer registration or address creation.
   """
@@ -7188,14 +7459,17 @@ type Settings {
   """Store seo information."""
   seo: SeoDetails
 
-  """Store favicon url."""
-  faviconUrl: String
-
   """The robots.txt file content for the store."""
   robotsTxt: String
 
-  """Analytics settings."""
-  webAnalytics: WebAnalytics
+  """Security settings from control panel"""
+  security: SecuritySettings
+
+  """Privacy settings from control panel"""
+  privacy: PrivacySettings
+
+  """Inactivity settings from control panel"""
+  inactivity: InactivitySettings
 }
 
 """A connection to a list of items."""
@@ -7220,6 +7494,18 @@ type ShopByPriceEdge {
 type ShopByPriceRange {
   """Category shop by price range."""
   ranges: MoneyRange!
+}
+
+"""Shopper locale."""
+type ShopperLocale {
+  """Resolved shopper locale."""
+  resolved: String
+}
+
+"""Shopper preferences."""
+type ShopperPreferences {
+  """Shopper locale."""
+  locale: ShopperLocale
 }
 
 """A site"""

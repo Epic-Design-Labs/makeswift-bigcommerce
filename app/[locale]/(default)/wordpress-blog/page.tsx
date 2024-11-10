@@ -29,6 +29,7 @@ export const getBlogPosts = async (first = 10) => {
     },
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   return data?.posts?.nodes;
 };
 
