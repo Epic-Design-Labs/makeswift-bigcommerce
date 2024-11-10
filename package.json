@@ -3,7 +3,7 @@
   "description": "",
   "version": "0.15.0",
   "scripts": {
-    "dev": "next dev",
+    "dev": "npm generate && next dev",
     "generate": "dotenv -e .env.local -- node ./scripts/generate.cjs",
     "build": "next build",
     "build:analyze": "ANALYZE=true npm run build",
